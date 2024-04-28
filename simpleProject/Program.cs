@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
-using Infrastructure;
 using Domain;
+using Service;
 
 namespace simpleProjet
 {
@@ -16,6 +16,7 @@ namespace simpleProjet
     /// </summary>
     public class Program
     {
+        private PersonService personService;
         public static void Main(params string[] args)
         {
             var program = new Program();
@@ -24,9 +25,13 @@ namespace simpleProjet
 
         public void Run()
         {
+            string connectionString = "Server=localhost;Database=AdventureWorks2022;Integrated Security = true;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
+            personService = new PersonService(connectionString);
+
             var people = GetPersons();
 
             ShowPersons(people);
+
             UpdatePeopleAge(people);
 
             string peopleFilePath = "people.csv";
@@ -36,42 +41,19 @@ namespace simpleProjet
             ShowPersons(importedPersons);
         }
 
-
-
-        public Person MapToDomain(PersonData personData)
+        private IEnumerable<Person> GetPersons()
         {
-            return new Person()
-            {
-                Id = personData.Id,
-                FirstName = personData.FirstName,
-                LastName = personData.LastName,
-                ModifiedDate = personData.ModifiedDate,
-                Title = personData.Title,
-            };
+            return personService.GetPersons();
         }
 
-        public Person MapToDomain(PersonCsv personData)
+        private IEnumerable<Person> ImportPersons(string peopleFilePath)
         {
-            return new Person()
-            {
-                Id = personData.Id,
-                FirstName = personData.FirstName,
-                LastName = personData.LastName,
-                ModifiedDate = personData.ModifiedDate,
-                Age = personData.Age,
-            };
+            return personService.ImportPersons(peopleFilePath);
         }
 
-        public PersonCsv MapToCsv(Person person)
+        private void ExportPersons(IEnumerable<Person> people, string peopleFilePath)
         {
-            return new PersonCsv()
-            {
-                Id = person.Id,
-                FirstName = person.FirstName,
-                LastName = person.LastName,
-                ModifiedDate = person.ModifiedDate,
-                Age = person.Age,
-            };
+            personService.ExportPersons(people, peopleFilePath);
         }
 
         public void ShowPersons(IEnumerable<Person> people)
@@ -88,26 +70,6 @@ namespace simpleProjet
             {
                 person.UpdateAge();
             }
-        }
-
-        public IEnumerable<Person> GetPersons()
-        {
-            string connectionString = "Server=localhost;Database=AdventureWorks2022;Integrated Security = true;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
-            var personDataProvider = new PersonDataProvider(connectionString);
-            return personDataProvider.GetPersons()
-                .Select(MapToDomain);
-        }
-
-        public void ExportPersons(IEnumerable<Person> people, string filePath)
-        {
-            var peopleCsv = people.Select(MapToCsv).ToList();
-            Infrastructure.CsvHelper.Write<PersonCsv>(peopleCsv, filePath);
-        }
-
-        public IEnumerable<Person> ImportPersons(string filePath)
-        {
-            return Infrastructure.CsvHelper.ReadCsv<PersonCsv>(filePath)
-                .Select(MapToDomain);
         }
     }
 }
