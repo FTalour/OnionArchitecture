@@ -1,20 +1,12 @@
-﻿using Microsoft.Data.SqlClient;
-using Dapper;
-using CsvHelper;
-using System.Diagnostics;
-using System.Globalization;
-using System.Text;
+﻿using System.Globalization;
+using Infrastructure;
 
 namespace simpleProjet
 {
     public class Person
     {
         public int Id { get; set; }
-
-        [CsvHelper.Configuration.Attributes.Ignore]
         public string? Title { get; set; }
-        
-        [CsvHelper.Configuration.Attributes.Name("GivenName", "FirstName")]
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public DateTime ModifiedDate { get; set; }
@@ -71,6 +63,44 @@ namespace simpleProjet
             ShowPersons(importedPersons);
         }
 
+
+
+        public Person MapToDomain(PersonData personData)
+        {
+            return new Person()
+            {
+                Id = personData.Id,
+                FirstName = personData.FirstName,
+                LastName = personData.LastName,
+                ModifiedDate = personData.ModifiedDate,
+                Title = personData.Title,
+            };
+        }
+
+        public Person MapToDomain(PersonCsv personData)
+        {
+            return new Person()
+            {
+                Id = personData.Id,
+                FirstName = personData.FirstName,
+                LastName = personData.LastName,
+                ModifiedDate = personData.ModifiedDate,
+                Age = personData.Age,
+            };
+        }
+
+        public PersonCsv MapToCsv(Person person)
+        {
+            return new PersonCsv()
+            {
+                Id = person.Id,
+                FirstName = person.FirstName,
+                LastName = person.LastName,
+                ModifiedDate = person.ModifiedDate,
+                Age = person.Age,
+            };
+        }
+
         public void ShowPersons(IEnumerable<Person> people)
         {
             foreach (var person in people)
@@ -90,44 +120,21 @@ namespace simpleProjet
         public IEnumerable<Person> GetPersons()
         {
             string connectionString = "Server=localhost;Database=AdventureWorks2022;Integrated Security = true;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;";
-
-            using (var conn = new SqlConnection(connectionString))
-            {
-                conn.Open();
-
-                var cmdText = @"
-                            SELECT [BusinessEntityID] Id
-                                ,[Title] Title
-                                ,[FirstName] FirstName
-                                ,[LastName] LastName
-                                ,[ModifiedDate] ModifiedDate
-                            FROM [Person].[Person]
-                            where Title is not null";
-
-                return conn.Query<Person>(cmdText).ToList();
-            }
+            var personDataProvider = new PersonDataProvider(connectionString);
+            return personDataProvider.GetPersons()
+                .Select(MapToDomain);
         }
 
         public void ExportPersons(IEnumerable<Person> people, string filePath)
         {
-            using (var writer = new StreamWriter(filePath))
-            {
-                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
-                {
-                    csv.WriteRecords(people);
-                }
-            }
+            var peopleCsv = people.Select(MapToCsv).ToList();
+            Infrastructure.CsvHelper.Write<PersonCsv>(peopleCsv, filePath);
         }
 
         public IEnumerable<Person> ImportPersons(string filePath)
         {
-            using (var reader = new StreamReader(filePath))
-            {
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
-                {
-                    return csv.GetRecords<Person>().ToList();
-                }
-            }
+            return Infrastructure.CsvHelper.ReadCsv<PersonCsv>(filePath)
+                .Select(MapToDomain);
         }
     }
 }
